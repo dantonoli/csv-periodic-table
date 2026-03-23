@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSV Periodic Table</title>
+<style>
+  /* ── Reset & Base ────────────────────────────── */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    background: transparent;        /* blend with SharePoint page background */
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    color: #1a1a1a;
+    overflow-x: hidden;
+  }
+
+  /* ── Config Bar ──────────────────────────────── */
+  #configBar {
+    background: #f3f2f1;
+    border-bottom: 2px solid #0078d4;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  #configBar label { font-weight: 600; color: #323130; white-space: nowrap; }
+  #configBar input {
+    flex: 1;
+    min-width: 200px;
+    max-width: 480px;
+    padding: 5px 10px;
+    border: 1px solid #8a8886;
+    border-radius: 3px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  #configBar input:focus { outline: 2px solid #0078d4; outline-offset: -1px; }
+  #applyBtn {
+    padding: 5px 16px;
+    background: #0078d4;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #applyBtn:hover { background: #106ebe; }
+  #configNote { color: #605e5c; font-size: 12px; }
+  #configToggle {
+    margin-left: auto;
+    background: none;
+    border: 1px solid #8a8886;
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #323130;
+    white-space: nowrap;
+  }
+  #configToggle:hover { background: #e1dfdd; }
+
+  /* ── Header ──────────────────────────────────── */
+  .sp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 8px;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-bottom: 1px solid #edebe9;
+    margin-bottom: 12px;
+  }
+  .sp-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .sp-logo {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, #0078d4, #106ebe);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 18px;
+    flex-shrink: 0;
+    letter-spacing: -0.5px;
+  }
+  .sp-title h1 { font-size: 22px; font-weight: 700; color: #201f1e; line-height: 1.2; }
+  .sp-title p  { font-size: 13px; color: #605e5c; margin-top: 2px; }
+
+  /* Search */
+  .sp-search {
+    position: relative;
+  }
+  .sp-search input {
+    padding: 7px 12px 7px 34px;
+    border: 1px solid #8a8886;
+    border-radius: 3px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 260px;
+    background: #fff;
+  }
+  .sp-search input:focus { outline: 2px solid #0078d4; outline-offset: -1px; }
+  .sp-search svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: #8a8886;
+  }
+
+  /* ── Main Layout ─────────────────────────────── */
+  .sp-body {
+    display: flex;
+    gap: 0;
+    padding: 0 12px 16px;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+
+  /* ── Grid ────────────────────────────────────── */
+  .sp-grid {
+    display: flex;
+    gap: 0;
+    flex-shrink: 0;
+    flex: 1;
+  }
+  .sp-col { display: flex; flex-direction: column; }
+
+  /* ── Tile ────────────────────────────────────── */
+  .tile {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 74px; height: 74px;
+    margin: 2px;
+    padding: 5px 6px;
+    border: 1.5px solid rgba(0,0,0,0.18);
+    border-radius: 4px;
+    cursor: pointer;
+    color: #fff;
+    text-decoration: none;
+    overflow: hidden;
+    position: relative;
+    z-index: 0;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .tile:hover {
+    transform: scale(1.55);
+    z-index: 200;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.22);
+    border-color: rgba(0,0,0,0.4);
+  }
+  .tile:focus-visible {
+    outline: 3px solid #0078d4;
+    outline-offset: 2px;
+  }
+  .tile.dimmed { opacity: 0.15; pointer-events: none; }
+  .tile.sp-placeholder { visibility: hidden; pointer-events: none; }
+
+  .tile-top {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .tile-gamp {
+    font-size: 7px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.2);
+    padding: 1px 3px;
+    border-radius: 2px;
+    line-height: 1.3;
+  }
+  .tile-abbr {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.3px;
+  }
+  .tile-name {
+    font-size: 7px;
+    line-height: 1.25;
+    opacity: 0.92;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  /* ── Legend / Category Filter ────────────────── */
+  .sp-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 0 4px 16px;
+    min-width: 170px;
+    flex-shrink: 0;
+  }
+  .sp-legend-heading {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #605e5c;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #edebe9;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #323130;
+    user-select: none;
+    border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .legend-item:hover { background: #f3f2f1; border-color: #edebe9; }
+  .legend-item.active { background: #deecf9; border-color: #0078d4; color: #004578; }
+  .legend-swatch {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .legend-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: #8a8886;
+    background: #f3f2f1;
+    border-radius: 10px;
+    padding: 1px 6px;
+  }
+
+  /* ── Column Labels ───────────────────────────── */
+  .col-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #605e5c;
+    text-align: center;
+    margin: 0 2px;
+    padding: 2px 0 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 74px;
+  }
+
+  /* ── Detail Panel (slide-in) ─────────────────── */
+  .sp-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 1000;
+  }
+  .sp-overlay.open { display: block; }
+
+  .sp-panel {
+    display: none;
+    position: fixed;
+    top: 0; right: 0;
+    width: 440px; max-width: 92vw;
+    height: 100vh;
+    background: #fff;
+    z-index: 1001;
+    overflow-y: auto;
+    box-shadow: -4px 0 28px rgba(0,0,0,0.14);
+    padding: 0;
+  }
+  .sp-panel.open { display: block; }
+
+  .panel-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid #edebe9;
+    position: sticky; top: 0;
+    background: #fff; z-index: 10;
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .panel-icon {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 16px;
+    flex-shrink: 0;
+    letter-spacing: -0.5px;
+  }
+  .panel-title-area { flex: 1; min-width: 0; }
+  .panel-title { font-size: 18px; font-weight: 700; color: #201f1e; line-height: 1.2; }
+  .panel-cat   { font-size: 12px; color: #605e5c; margin-top: 3px; }
+  .panel-close {
+    background: none; border: none; font-size: 20px; cursor: pointer;
+    color: #605e5c; line-height: 1; padding: 2px; border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .panel-close:hover { background: #f3f2f1; color: #201f1e; }
+
+  .panel-body { padding: 20px; }
+
+  .panel-section { margin-bottom: 20px; }
+  .panel-section h3 {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    color: #605e5c; margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #edebe9;
+  }
+  .panel-section p { font-size: 14px; line-height: 1.6; color: #323130; }
+
+  .panel-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 12px; font-weight: 600;
+    color: #fff;
+  }
+  .panel-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .panel-tag {
+    font-size: 12px;
+    padding: 3px 10px;
+    background: #f3f2f1;
+    border: 1px solid #edebe9;
+    border-radius: 12px;
+    color: #323130;
+  }
+  .panel-refs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .panel-ref {
+    font-size: 12px;
+    padding: 4px 10px;
+    background: #deecf9;
+    border: 1px solid #c7e0f4;
+    border-radius: 3px;
+    color: #004578;
+  }
+
+  /* KMS link button */
+  .kms-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 9px 18px;
+    background: #0078d4;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .kms-btn:hover { background: #106ebe; }
+  .kms-btn svg { width: 14px; height: 14px; }
+  .kms-btn-note { font-size: 11px; color: #8a8886; margin-top: 6px; }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 900px) {
+    .sp-body { flex-direction: column; }
+    .sp-legend { flex-direction: row; flex-wrap: wrap; min-width: unset; padding: 8px 0 0; }
+    .sp-legend-heading { width: 100%; }
+    .tile { width: 60px; height: 60px; }
+    .tile-abbr { font-size: 12px; }
+    .tile-name { font-size: 6px; }
+    .col-label { max-width: 60px; font-size: 7px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Admin Config Bar ────────────────────────────────── -->
+<div id="configBar">
+  <label for="kmsBaseUrl">&#x1F517; SharePoint KMS URL:</label>
+  <input type="url" id="kmsBaseUrl" placeholder="https://yourcompany.sharepoint.com/sites/CSV-KMS"
+         value="">
+  <button id="applyBtn" onclick="applyBaseUrl()">Apply</button>
+  <span id="configNote">Tile links will point to <em>{URL}/SitePages/{service-name}.aspx</em></span>
+  <button id="configToggle" onclick="toggleConfig()">Hide setup</button>
+</div>
+
+<!-- ── Page Header ─────────────────────────────────────── -->
+<div class="sp-header">
+  <div class="sp-header-left">
+    <div class="sp-logo">CSV</div>
+    <div class="sp-title">
+      <h1>CSV Periodic Table</h1>
+      <p>Computer System Validation Services — click any tile to explore</p>
+    </div>
+  </div>
+  <div class="sp-search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+    </svg>
+    <input type="text" id="searchInput" placeholder="Search services...">
+  </div>
+</div>
+
+<!-- ── Main Body ────────────────────────────────────────── -->
+<div class="sp-body">
+  <div class="sp-grid" id="spGrid"></div>
+  <div class="sp-legend" id="spLegend">
+    <div class="sp-legend-heading">Filter by Category</div>
+  </div>
+</div>
+
+<!-- ── Detail Panel ─────────────────────────────────────── -->
+<div class="sp-overlay" id="spOverlay"></div>
+<div class="sp-panel" id="spPanel">
+  <div class="panel-header">
+    <div class="panel-icon" id="panelIcon"></div>
+    <div class="panel-title-area">
+      <div class="panel-title" id="panelTitle"></div>
+      <div class="panel-cat" id="panelCat"></div>
+    </div>
+    <button class="panel-close" id="panelClose" aria-label="Close">&#x2715;</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<script>
+// ── Configuration ─────────────────────────────────────────
+let KMS_BASE = '';
+
+function applyBaseUrl() {
+  KMS_BASE = (document.getElementById('kmsBaseUrl').value || '').replace(/\/$/, '');
+  document.getElementById('configNote').innerHTML =
+    KMS_BASE
+      ? `<span style="color:#107c10">&#10003; Links updated &mdash; tiles now point to <em>${KMS_BASE}/SitePages/{name}.aspx</em></span>`
+      : 'Tile links will point to <em>{URL}/SitePages/{service-name}.aspx</em>';
+}
+
+function toggleConfig() {
+  const bar = document.getElementById('configBar');
+  const btn = document.getElementById('configToggle');
+  const inner = Array.from(bar.children).filter(el => el.id !== 'configToggle');
+  const hidden = inner[0].style.display === 'none';
+  inner.forEach(el => el.style.display = hidden ? '' : 'none');
+  btn.textContent = hidden ? 'Hide setup' : 'Show setup';
+}
+
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function getKmsUrl(el) {
+  if (!KMS_BASE) return null;
+  return `${KMS_BASE}/SitePages/${slugify(el.name)}.aspx`;
+}
+
+// ── Data ─────────────────────────────────────────────────
+const CATEGORIES = [
+  { id: 'planning',       name: 'Planning',           color: '#d32f2f' },
+  { id: 'risk',           name: 'Risk Management',    color: '#e65100' },
+  { id: 'requirements',   name: 'Requirements',       color: '#f9a825' },
+  { id: 'design',         name: 'Design & Config',    color: '#2e7d32' },
+  { id: 'testing',        name: 'Testing',             color: '#1565c0' },
+  { id: 'documentation',  name: 'Documentation',       color: '#6a1b9a' },
+  { id: 'compliance',     name: 'Compliance',          color: '#00838f' },
+  { id: 'lifecycle',      name: 'Lifecycle Mgmt',      color: '#4e342e' },
+  { id: 'data',           name: 'Data Integrity',      color: '#c2185b' },
+  { id: 'infrastructure', name: 'Infrastructure',      color: '#455a64' },
+  { id: 'automation',     name: 'Automation & Tools',  color: '#0d47a1' },
+  { id: 'training',       name: 'Training & QA',       color: '#ff6f00' },
+];
+
+const ELEMENTS = [
+  // PLANNING (col 0)
+  { abbr:'VP',  name:'Validation Plan',            cat:'planning',       gamp:'G5',   desc:'Master document defining the validation approach, scope, responsibilities, deliverables, and acceptance criteria for a system validation project.', refs:['GAMP 5','ISPE Baseline Guide'], keywords:['strategy','scope','approach'] },
+  { abbr:'VMP', name:'Validation Master Plan',     cat:'planning',       gamp:'G5',   desc:'High-level document describing the overall validation philosophy, strategy, and organizational approach across all computerized systems within a facility or company.', refs:['EU Annex 11','FDA Guidance'], keywords:['enterprise','strategy','policy'] },
+  { abbr:'PSS', name:'Project Scope Statement',    cat:'planning',       gamp:'G5',   desc:'Defines the boundaries, objectives, deliverables, and constraints of the validation project to align stakeholders.', refs:['GAMP 5'], keywords:['scope','boundaries','objectives'] },
+  { abbr:'SIA', name:'System Impact Assessment',   cat:'planning',       gamp:'G5',   desc:'Initial assessment to determine if a system has GxP impact and requires formal validation, categorizing direct, indirect, or no impact.', refs:['GAMP 5','ASTM E2500'], keywords:['impact','assessment','GxP'] },
+  { abbr:'VTL', name:'Validation Timeline',        cat:'planning',       gamp:'G5',   desc:'Project schedule mapping all validation activities, milestones, dependencies, and resource allocation across the validation lifecycle.', refs:['GAMP 5'], keywords:['schedule','milestones','timeline'] },
+  { abbr:'SOW', name:'Statement of Work',          cat:'planning',       gamp:'G5',   desc:'Contractual document defining vendor deliverables, acceptance criteria, responsibilities, and timelines for validation-related work.', refs:['GAMP 5'], keywords:['vendor','contract','deliverables'] },
+  { abbr:'SAP', name:'System Assessment Protocol', cat:'planning',       gamp:'G5',   desc:'Protocol to evaluate system category, complexity, and regulatory impact to determine the appropriate validation approach.', refs:['GAMP 5','ISPE'], keywords:['assessment','categorization'] },
+
+  // RISK MANAGEMENT (col 1)
+  { abbr:'RA',  name:'Risk Assessment',            cat:'risk',           gamp:'G5',   desc:'Systematic process to identify, analyze, and evaluate risks associated with a computerized system using techniques like FMEA, FTA, or HACCP.', refs:['ICH Q9','GAMP 5'], keywords:['FMEA','risk','hazard'] },
+  { abbr:'FRA', name:'Functional Risk Assessment', cat:'risk',           gamp:'G5',   desc:'Risk assessment focused on system functions and their potential impact on patient safety, product quality, and data integrity.', refs:['GAMP 5','ICH Q9'], keywords:['functional','risk','impact'] },
+  { abbr:'SSA', name:'Supplier Assessment',        cat:'risk',           gamp:'G5',   desc:'Evaluation of supplier quality systems, development practices, and capability to deliver validated systems.', refs:['GAMP 5 Appendix M3'], keywords:['supplier','audit','quality'] },
+  { abbr:'SRA', name:'Security Risk Assessment',   cat:'risk',           gamp:'G5',   desc:'Assessment of cybersecurity threats, vulnerabilities, and controls for computerized systems handling GxP data.', refs:['GAMP 5','21 CFR Part 11'], keywords:['security','cyber','threat'] },
+  { abbr:'CRA', name:'Change Risk Assessment',     cat:'risk',           gamp:'G5',   desc:'Risk evaluation performed when system changes are proposed to determine impact on validated state and required re-validation activities.', refs:['GAMP 5','ICH Q10'], keywords:['change','impact','re-validation'] },
+  { abbr:'RMR', name:'Risk Mitigation Register',   cat:'risk',           gamp:'G5',   desc:'Living document tracking identified risks, their severity, likelihood, detectability, and the controls or mitigations applied.', refs:['ICH Q9','GAMP 5'], keywords:['register','mitigation','controls'] },
+
+  // REQUIREMENTS (col 2)
+  { abbr:'URS', name:'User Requirements Spec.',    cat:'requirements',   gamp:'G5',   desc:'Document specifying what the user needs the system to do, written in business terms. The foundation of the V-model and traceability matrix.', refs:['GAMP 5','EU Annex 11'], keywords:['user','needs','requirements'] },
+  { abbr:'FS',  name:'Functional Specification',   cat:'requirements',   gamp:'G5',   desc:'Describes what the system will do to satisfy the URS — system functions, features, interfaces, data flows, and business rules.', refs:['GAMP 5'], keywords:['functions','features','specification'] },
+  { abbr:'CS',  name:'Configuration Specification',cat:'requirements',   gamp:'G5',   desc:'Documents all configurable system settings, parameters, and options that define system behavior without custom code.', refs:['GAMP 5'], keywords:['configuration','settings','parameters'] },
+  { abbr:'DS',  name:'Design Specification',       cat:'requirements',   gamp:'G5',   desc:'Technical document describing how the system will be built — architecture, data models, algorithms, and interfaces to meet the FS.', refs:['GAMP 5'], keywords:['technical','design','architecture'] },
+  { abbr:'RTM', name:'Requirements Traceability',  cat:'requirements',   gamp:'G5',   desc:'Matrix mapping requirements from URS through FS/DS to test cases, ensuring complete coverage and bidirectional traceability.', refs:['GAMP 5','EU Annex 11'], keywords:['traceability','coverage','matrix'] },
+  { abbr:'DIS', name:'Data Integrity Spec.',       cat:'requirements',   gamp:'DI',   desc:'Requirements specific to ALCOA+ principles — attributable, legible, contemporaneous, original, and accurate data handling.', refs:['FDA Data Integrity Guidance','WHO'], keywords:['ALCOA','data','integrity'] },
+
+  // DESIGN & CONFIG (col 3)
+  { abbr:'SDS', name:'System Design Spec.',        cat:'design',         gamp:'G5',   desc:'Detailed technical design covering software architecture, database schema, integration patterns, and security architecture.', refs:['GAMP 5','IEEE 1016'], keywords:['architecture','database','integration'] },
+  { abbr:'CFG', name:'Configuration Document',     cat:'design',         gamp:'G5',   desc:'Records all system configuration settings, user roles, workflow definitions, and business rule setups applied during implementation.', refs:['GAMP 5'], keywords:['config','setup','roles'] },
+  { abbr:'IFD', name:'Interface Design Document',  cat:'design',         gamp:'G5',   desc:'Specifies integration points between validated systems — data exchange protocols, APIs, file formats, and error handling.', refs:['GAMP 5'], keywords:['API','integration','interface'] },
+  { abbr:'WFD', name:'Workflow Design',            cat:'design',         gamp:'G5',   desc:'Documents electronic workflow configurations including approval hierarchies, routing rules, escalation paths, and e-signature requirements.', refs:['GAMP 5','21 CFR Part 11'], keywords:['workflow','approval','e-signature'] },
+  { abbr:'RPT', name:'Report Design',              cat:'design',         gamp:'G5',   desc:'Specification of system-generated reports, dashboards, and outputs — layouts, data sources, calculations, and distribution rules.', refs:['GAMP 5'], keywords:['reports','dashboards','outputs'] },
+  { abbr:'MIG', name:'Data Migration Plan',        cat:'design',         gamp:'G5',   desc:'Strategy and procedures for migrating data from legacy systems, including mapping, transformation rules, and verification methods.', refs:['GAMP 5','EU Annex 11'], keywords:['migration','legacy','data transfer'] },
+
+  // TESTING (col 4)
+  { abbr:'IQ',  name:'Installation Qualification', cat:'testing',        gamp:'G5',   desc:'Documented verification that the system is installed correctly per specifications — hardware, software, network, and infrastructure components.', refs:['GAMP 5','EU Annex 11','FDA'], keywords:['installation','verification','infrastructure'] },
+  { abbr:'OQ',  name:'Operational Qualification',  cat:'testing',        gamp:'G5',   desc:'Testing that the system operates as intended across all specified operating ranges, including normal, boundary, and error conditions.', refs:['GAMP 5','EU Annex 11','FDA'], keywords:['operational','boundary','error'] },
+  { abbr:'PQ',  name:'Performance Qualification',  cat:'testing',        gamp:'G5',   desc:'Testing that the system consistently performs as intended in the actual production environment with real users and representative data.', refs:['GAMP 5','EU Annex 11','FDA'], keywords:['performance','production','end-to-end'] },
+  { abbr:'UAT', name:'User Acceptance Testing',    cat:'testing',        gamp:'G5',   desc:'Testing performed by end-users to confirm the system meets business requirements and is fit for intended use in real operational conditions.', refs:['GAMP 5','ISPE'], keywords:['user','acceptance','business'] },
+  { abbr:'TSC', name:'Test Script',                cat:'testing',        gamp:'G5',   desc:'Step-by-step documented test procedure with pre-conditions, test steps, expected results, and pass/fail criteria for each test case.', refs:['GAMP 5','IEEE 829'], keywords:['test case','procedure','script'] },
+  { abbr:'RGT', name:'Regression Testing',         cat:'testing',        gamp:'G5',   desc:'Re-execution of previously passed tests after system changes to confirm that existing functionality remains unaffected.', refs:['GAMP 5','ISPE'], keywords:['regression','change','retest'] },
+  { abbr:'P11', name:'Part 11 Assessment',         cat:'testing',        gamp:'P11',  desc:'Assessment and testing of system compliance with 21 CFR Part 11 requirements for electronic records and electronic signatures.', refs:['21 CFR Part 11','FDA Guidance'], keywords:['electronic records','e-signatures','Part 11'] },
+  { abbr:'AX11',name:'Annex 11 Assessment',        cat:'testing',        gamp:'AX11', desc:'Evaluation of computerized system compliance with EU GMP Annex 11 requirements for data integrity, access controls, and audit trails.', refs:['EU GMP Annex 11','PIC/S PI 011'], keywords:['EU','Annex 11','GMP'] },
+
+  // DOCUMENTATION (col 6)
+  { abbr:'VR',  name:'Validation Report',          cat:'documentation',  gamp:'G5',   desc:'Summary report documenting validation execution results, deviations, residual risks, and formal conclusion on the validated state of the system.', refs:['GAMP 5','EU Annex 11'], keywords:['summary','results','conclusion'] },
+  { abbr:'VSR', name:'Validation Summary Report',  cat:'documentation',  gamp:'G5',   desc:'Executive-level summary of the entire validation effort, including key findings, acceptance status, and recommendations for operational use.', refs:['GAMP 5'], keywords:['executive','summary','acceptance'] },
+  { abbr:'SOP', name:'Standard Operating Procedure',cat:'documentation', gamp:'G5',   desc:'Step-by-step procedural documents governing how validated systems should be operated, maintained, and controlled in routine use.', refs:['GMP','FDA'], keywords:['procedure','operations','routine'] },
+  { abbr:'TR',  name:'Test Report',                cat:'documentation',  gamp:'G5',   desc:'Compiled results from IQ/OQ/PQ execution including test evidence, deviations encountered, and pass/fail determination per protocol.', refs:['GAMP 5'], keywords:['test results','evidence','deviations'] },
+  { abbr:'DL',  name:'Deviation Log',              cat:'documentation',  gamp:'G5',   desc:'Log tracking all deviations observed during validation execution — description, impact assessment, root cause, and CAPA resolution.', refs:['GAMP 5','ICH Q10'], keywords:['deviation','CAPA','root cause'] },
+  { abbr:'TMS', name:'Traceability Matrix Summary', cat:'documentation', gamp:'G5',   desc:'Final traceability document confirming all requirements have been tested and verified, linking URS, FS, test scripts, and results.', refs:['GAMP 5'], keywords:['traceability','verification','completeness'] },
+
+  // COMPLIANCE (col 7)
+  { abbr:'GXP', name:'GxP Assessment',             cat:'compliance',     gamp:'G5',   desc:'Determination of which GxP regulations apply (GMP, GLP, GCP, GDP) and their specific requirements for the system under validation.', refs:['FDA','EMA','ICH'], keywords:['GMP','GLP','GCP','regulatory'] },
+  { abbr:'ERA', name:'Electronic Records Assessment',cat:'compliance',   gamp:'P11',  desc:'Assessment of how the system creates, modifies, maintains, and archives electronic records in compliance with predicate rules.', refs:['21 CFR Part 11','EU Annex 11'], keywords:['electronic records','predicate rule'] },
+  { abbr:'ESA', name:'E-Signature Assessment',     cat:'compliance',     gamp:'P11',  desc:'Evaluation of electronic signature implementation including signature meaning, linking, and non-repudiation controls.', refs:['21 CFR Part 11'], keywords:['e-signature','authentication','non-repudiation'] },
+  { abbr:'ATC', name:'Audit Trail Configuration',  cat:'compliance',     gamp:'G5',   desc:'Design and verification of audit trail functionality — what events are logged, who, when, old/new values, and review procedures.', refs:['EU Annex 11','21 CFR Part 11'], keywords:['audit trail','logging','review'] },
+  { abbr:'CSA', name:'Computer Software Assurance',cat:'compliance',     gamp:'CSA',  desc:"FDA risk-based approach using critical thinking to determine appropriate assurance activities based on risk to patient safety.", refs:['FDA CSA Draft Guidance','GAMP 5 2nd Ed'], keywords:['CSA','risk-based','critical thinking'] },
+  { abbr:'DIG', name:'Data Integrity Governance',  cat:'compliance',     gamp:'G5',   desc:'Framework ensuring organizational controls, culture, and processes support data integrity across all computerized systems.', refs:['FDA DI Guidance','MHRA','WHO'], keywords:['governance','culture','ALCOA+'] },
+
+  // LIFECYCLE (col 8)
+  { abbr:'CC',  name:'Change Control',             cat:'lifecycle',      gamp:'G5',   desc:'Formal process to evaluate, approve, implement, and verify changes to validated systems while maintaining the validated state.', refs:['GAMP 5','ICH Q10','EU Annex 11'], keywords:['change','approval','impact'] },
+  { abbr:'PR',  name:'Periodic Review',            cat:'lifecycle',      gamp:'G5',   desc:'Scheduled review of validated systems to confirm continued compliance, assess cumulative changes, and verify the system remains fit for purpose.', refs:['GAMP 5','EU Annex 11'], keywords:['periodic','review','fitness'] },
+  { abbr:'RET', name:'System Retirement',          cat:'lifecycle',      gamp:'G5',   desc:'Controlled decommissioning of validated systems including data migration, archiving, retention requirements, and regulatory notification.', refs:['GAMP 5','EU Annex 11'], keywords:['retirement','decommission','archiving'] },
+  { abbr:'INC', name:'Incident Management',        cat:'lifecycle',      gamp:'G5',   desc:'Process for handling system failures, anomalies, and deviations — investigation, impact assessment, CAPA, and return to validated state.', refs:['GAMP 5','ICH Q10'], keywords:['incident','failure','CAPA'] },
+  { abbr:'PTM', name:'Patch Management',           cat:'lifecycle',      gamp:'G5',   desc:'Controlled process for evaluating, testing, and deploying software patches and updates while maintaining system validated state.', refs:['GAMP 5','EU Annex 11'], keywords:['patches','updates','security'] },
+  { abbr:'BCK', name:'Backup & Recovery',          cat:'lifecycle',      gamp:'G5',   desc:'Validation of backup procedures, recovery processes, and disaster recovery plans including regular testing of restore capabilities.', refs:['EU Annex 11','21 CFR Part 11'], keywords:['backup','disaster recovery','restore'] },
+
+  // DATA INTEGRITY (col 10)
+  { abbr:'ALC', name:'ALCOA+ Assessment',          cat:'data',           gamp:'DI',   desc:'Evaluation of data against ALCOA+ principles: Attributable, Legible, Contemporaneous, Original, Accurate, plus Complete, Consistent, Enduring, Available.', refs:['FDA DI Guidance','WHO','MHRA'], keywords:['ALCOA','attributable','complete'] },
+  { abbr:'ATR', name:'Audit Trail Review',         cat:'data',           gamp:'DI',   desc:'Procedural review of audit trail entries to detect unauthorized changes, deletions, or anomalies in GxP-relevant data.', refs:['EU Annex 11','FDA DI Guidance'], keywords:['audit trail','review','anomalies'] },
+  { abbr:'DAR', name:'Data Archive & Retrieval',   cat:'data',           gamp:'DI',   desc:'Validated processes for long-term data archival, format preservation, accessibility, and retrieval throughout the required retention period.', refs:['EU Annex 11','21 CFR Part 11'], keywords:['archival','retention','retrieval'] },
+  { abbr:'DFD', name:'Data Flow Diagram',          cat:'data',           gamp:'G5',   desc:'Documentation of how data moves through the system — creation, processing, storage, transmission, and destruction points.', refs:['GAMP 5'], keywords:['data flow','mapping','lifecycle'] },
+  { abbr:'DMV', name:'Data Migration Verification',cat:'data',           gamp:'G5',   desc:'Documented verification that migrated data is complete, accurate, and maintains integrity when transferred between systems.', refs:['GAMP 5','EU Annex 11'], keywords:['migration','verification','completeness'] },
+
+  // INFRASTRUCTURE (col 11)
+  { abbr:'IQI', name:'Infrastructure Qualification',cat:'infrastructure',gamp:'G5',   desc:'Qualification of the underlying IT infrastructure — servers, networks, virtualization, cloud services — supporting validated applications.', refs:['GAMP IT Infrastructure Guide'], keywords:['servers','network','cloud'] },
+  { abbr:'CVQ', name:'Cloud Validation',           cat:'infrastructure', gamp:'G5',   desc:'Validation approach for cloud-hosted systems (IaaS, PaaS, SaaS) including shared responsibility model and service level agreements.', refs:['GAMP Cloud Guide','ISPE'], keywords:['cloud','SaaS','IaaS'] },
+  { abbr:'ENV', name:'Environment Qualification',  cat:'infrastructure', gamp:'G5',   desc:'Qualification of development, testing, staging, and production environments including separation controls and configuration management.', refs:['GAMP 5'], keywords:['environments','dev','staging'] },
+  { abbr:'ACC', name:'Access Control Validation',  cat:'infrastructure', gamp:'G5',   desc:'Verification of user access controls, role-based permissions, segregation of duties, and authentication mechanisms.', refs:['21 CFR Part 11','EU Annex 11'], keywords:['access','roles','authentication'] },
+  { abbr:'NWV', name:'Network Validation',         cat:'infrastructure', gamp:'G5',   desc:'Qualification of network infrastructure, connectivity, bandwidth, and security controls supporting validated systems.', refs:['GAMP IT Guide'], keywords:['network','connectivity','security'] },
+
+  // AUTOMATION (col 12)
+  { abbr:'ATS', name:'Automated Test Scripts',     cat:'automation',     gamp:'G5',   desc:'Pre-programmed test scripts using automation tools (e.g., Selenium, UFT) for repeatable, efficient execution of qualification protocols.', refs:['GAMP 5','ISPE'], keywords:['automation','Selenium','scripts'] },
+  { abbr:'VMS', name:'Validation Mgmt System',     cat:'automation',     gamp:'G5',   desc:'Software platform for managing the entire validation lifecycle — document control, test execution, defect tracking, and compliance reporting.', refs:['GAMP 5'], keywords:['VLMS','management','tracking'] },
+  { abbr:'ETL', name:'ETL Validation',             cat:'automation',     gamp:'G5',   desc:'Validation of Extract-Transform-Load processes ensuring data accuracy, completeness, and integrity during automated data processing.', refs:['GAMP 5','GAMP Data Integrity Guide'], keywords:['ETL','data processing','transformation'] },
+  { abbr:'RPA', name:'RPA Validation',             cat:'automation',     gamp:'G5',   desc:'Validation of Robotic Process Automation bots performing GxP-relevant tasks, including bot logic verification and exception handling.', refs:['GAMP 5','ISPE'], keywords:['RPA','bots','automation'] },
+  { abbr:'CDS', name:'Chromatography Data System', cat:'automation',     gamp:'C4',   desc:'Validation of CDS systems (e.g., Empower, Chromeleon) used in lab environments for analytical data acquisition, processing, and reporting.', refs:['GAMP 5','USP <1058>'], keywords:['CDS','lab','chromatography'] },
+  { abbr:'LMS', name:'LIMS Validation',            cat:'automation',     gamp:'C4',   desc:'Validation of Laboratory Information Management Systems managing sample tracking, test results, and instrument integration.', refs:['GAMP 5','USP <1058>'], keywords:['LIMS','laboratory','samples'] },
+
+  // TRAINING & QA (col 13)
+  { abbr:'TRP', name:'Training Plan',              cat:'training',       gamp:'G5',   desc:'Plan defining training requirements for system users, administrators, and validation team members including curricula and competency assessment.', refs:['GAMP 5','GMP'], keywords:['training','competency','curriculum'] },
+  { abbr:'TRR', name:'Training Records',           cat:'training',       gamp:'G5',   desc:'Documented evidence of training completion for all personnel involved in system operation, administration, and validation activities.', refs:['GMP','21 CFR 211.25'], keywords:['records','evidence','completion'] },
+  { abbr:'QAR', name:'QA Review & Approval',       cat:'training',       gamp:'G5',   desc:'Quality Assurance review and approval gates throughout the validation lifecycle ensuring compliance with SOPs and regulatory requirements.', refs:['GAMP 5','ICH Q10'], keywords:['QA','approval','review'] },
+  { abbr:'CAP', name:'CAPA Management',            cat:'training',       gamp:'G5',   desc:'Corrective and Preventive Action process for addressing validation deviations, test failures, and system non-conformances.', refs:['ICH Q10','FDA'], keywords:['CAPA','corrective','preventive'] },
+  { abbr:'KPI', name:'Validation KPI Metrics',     cat:'training',       gamp:'G5',   desc:'Key performance indicators tracking validation efficiency, deviation rates, cycle times, right-first-time rates, and compliance metrics.', refs:['GAMP 5','ISPE'], keywords:['metrics','KPI','efficiency'] },
+  { abbr:'CME', name:'Continuous Monitoring',      cat:'training',       gamp:'G5',   desc:'Ongoing monitoring program for validated systems including performance trending, alert management, and proactive issue identification.', refs:['GAMP 5','EU Annex 11'], keywords:['monitoring','trending','alerts'] },
+];
+
+const COL_MAP = {
+  planning: 0, risk: 1, requirements: 2, design: 3,
+  testing: 4, documentation: 6, compliance: 7, lifecycle: 8,
+  data: 10, infrastructure: 11, automation: 12, training: 13,
+};
+
+const COL_LABELS = {
+  0: 'Planning', 1: 'Risk', 2: 'Requirements', 3: 'Design',
+  4: 'Testing', 6: 'Documentation', 7: 'Compliance', 8: 'Lifecycle',
+  10: 'Data Integrity', 11: 'Infrastructure', 12: 'Automation', 13: 'Training & QA',
+};
+
+// ── Build Grid ────────────────────────────────────────────
+function buildGrid() {
+  const grid = document.getElementById('spGrid');
+  grid.innerHTML = '';
+
+  const columns = {};
+  ELEMENTS.forEach(el => {
+    const col = COL_MAP[el.cat];
+    if (col === undefined) return;
+    if (!columns[col]) columns[col] = [];
+    columns[col].push(el);
+  });
+
+  const maxCol = Math.max(...Object.keys(columns).map(Number));
+  const maxRows = Math.max(...Object.values(columns).map(a => a.length));
+
+  for (let c = 0; c <= maxCol; c++) {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'sp-col';
+
+    // column label
+    const lbl = document.createElement('div');
+    lbl.className = 'col-label';
+    lbl.textContent = COL_LABELS[c] || '';
+    colDiv.appendChild(lbl);
+
+    const elems = columns[c] || [];
+    for (let r = 0; r < maxRows; r++) {
+      if (r < elems.length) {
+        colDiv.appendChild(makeTile(elems[r]));
+      } else if (elems.length > 0) {
+        const ph = document.createElement('div');
+        ph.className = 'tile sp-placeholder';
+        colDiv.appendChild(ph);
+      } else {
+        // empty spacer column (col 5, 9)
+        const sp = document.createElement('div');
+        sp.className = 'tile sp-placeholder';
+        sp.style.visibility = 'hidden';
+        colDiv.appendChild(sp);
+      }
+    }
+    grid.appendChild(colDiv);
+  }
+}
+
+function makeTile(el) {
+  const cat = CATEGORIES.find(c => c.id === el.cat);
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.dataset.cat = el.cat;
+  tile.dataset.abbr = el.abbr;
+  tile.style.backgroundColor = cat.color;
+  tile.tabIndex = 0;
+  tile.setAttribute('role', 'button');
+  tile.setAttribute('aria-label', el.name);
+  tile.innerHTML = `
+    <div class="tile-top"><span class="tile-gamp">${el.gamp}</span></div>
+    <div class="tile-abbr">${el.abbr}</div>
+    <div class="tile-name">${el.name}</div>`;
+  tile.addEventListener('click', () => openPanel(el));
+  tile.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openPanel(el); });
+  return tile;
+}
+
+// ── Build Legend ──────────────────────────────────────────
+function buildLegend() {
+  const legend = document.getElementById('spLegend');
+  CATEGORIES.forEach(cat => {
+    const count = ELEMENTS.filter(e => e.cat === cat.id).length;
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.dataset.cat = cat.id;
+    item.innerHTML = `<div class="legend-swatch" style="background:${cat.color}"></div>
+      <span>${cat.name}</span>
+      <span class="legend-count">${count}</span>`;
+    item.addEventListener('click', () => toggleFilter(cat.id, item));
+    legend.appendChild(item);
+  });
+}
+
+let activeFilter = null;
+function toggleFilter(catId, itemEl) {
+  const tiles = document.querySelectorAll('.tile:not(.sp-placeholder)');
+  document.querySelectorAll('.legend-item').forEach(li => li.classList.remove('active'));
+  if (activeFilter === catId) {
+    activeFilter = null;
+    tiles.forEach(t => t.classList.remove('dimmed'));
+  } else {
+    activeFilter = catId;
+    itemEl.classList.add('active');
+    tiles.forEach(t => t.classList.toggle('dimmed', t.dataset.cat !== catId));
+  }
+}
+
+// ── Search ────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  const tiles = document.querySelectorAll('.tile:not(.sp-placeholder)');
+  // reset filter
+  activeFilter = null;
+  document.querySelectorAll('.legend-item').forEach(li => li.classList.remove('active'));
+  if (!q) { tiles.forEach(t => t.classList.remove('dimmed')); return; }
+  tiles.forEach(t => {
+    const el = ELEMENTS.find(e => e.abbr === t.dataset.abbr);
+    if (!el) return;
+    const hay = `${el.abbr} ${el.name} ${el.desc} ${el.keywords.join(' ')} ${el.cat}`.toLowerCase();
+    t.classList.toggle('dimmed', !hay.includes(q));
+  });
+});
+
+// ── Detail Panel ──────────────────────────────────────────
+function openPanel(el) {
+  const cat = CATEGORIES.find(c => c.id === el.cat);
+  const kmsUrl = getKmsUrl(el);
+
+  document.getElementById('panelIcon').style.background = cat.color;
+  document.getElementById('panelIcon').textContent = el.abbr;
+  document.getElementById('panelTitle').textContent = el.name;
+  document.getElementById('panelCat').textContent = cat.name + ' \u2022 ' + el.gamp;
+
+  const kmsSection = kmsUrl
+    ? `<div class="panel-section">
+        <h3>Knowledge Base</h3>
+        <a class="kms-btn" href="${kmsUrl}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          Open in KMS
+        </a>
+        <div class="kms-btn-note">Opens the full knowledge page in SharePoint</div>
+       </div>`
+    : `<div class="panel-section">
+        <h3>Knowledge Base</h3>
+        <p style="font-size:13px;color:#8a8886;">Set your SharePoint KMS URL in the setup bar above to enable direct links.</p>
+       </div>`;
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section">
+      <h3>Description</h3>
+      <p>${el.desc}</p>
+    </div>
+    <div class="panel-section">
+      <h3>Category</h3>
+      <span class="panel-badge" style="background:${cat.color}">${cat.name}</span>
+    </div>
+    <div class="panel-section">
+      <h3>Tags</h3>
+      <div class="panel-tags">
+        <span class="panel-tag">${el.gamp}</span>
+        ${el.keywords.map(k => `<span class="panel-tag">${k}</span>`).join('')}
+      </div>
+    </div>
+    <div class="panel-section">
+      <h3>Regulatory References</h3>
+      <div class="panel-refs">${el.refs.map(r => `<span class="panel-ref">${r}</span>`).join('')}</div>
+    </div>
+    ${kmsSection}`;
+
+  document.getElementById('spOverlay').classList.add('open');
+  document.getElementById('spPanel').classList.add('open');
+  document.getElementById('panelClose').focus();
+}
+
+function closePanel() {
+  document.getElementById('spOverlay').classList.remove('open');
+  document.getElementById('spPanel').classList.remove('open');
+}
+document.getElementById('panelClose').addEventListener('click', closePanel);
+document.getElementById('spOverlay').addEventListener('click', closePanel);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+// ── Init ──────────────────────────────────────────────────
+buildGrid();
+buildLegend();
+</script>
+</body>
+</html>
